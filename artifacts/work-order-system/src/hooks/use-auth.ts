@@ -40,6 +40,7 @@ export function useAuth() {
     localStorage.setItem("token", newToken);
     setToken(newToken);
     queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    setLocation("/");
   };
 
   const logout = () => {

@@ -91,38 +91,44 @@ def health():
 
 @app.route("/auth/register", methods=["POST"])
 def register():
-    data = request.json
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
-    full_name = data.get("full_name", "").strip()
-    role = data.get("role", "student")
-    department = data.get("department", "")
+    try:
+        data = request.json
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
+        full_name = data.get("full_name", "").strip()
+        role = data.get("role", "student")
+        department = data.get("department", "")
 
-    if not email or not password or not full_name:
-        return jsonify({"error": "Missing required fields"}), 400
+        if not email or not password or not full_name:
+            return jsonify({"error": "Missing required fields"}), 400
 
-    existing = supabase.table("users").select("id").eq("email", email).execute()
-    if existing.data:
-        return jsonify({"error": "Email already registered"}), 400
+        existing = supabase.table("users").select("id").eq("email", email).execute()
+        if existing.data:
+            return jsonify({"error": "Email already registered"}), 400
 
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    user_id = str(uuid.uuid4())
-    now = datetime.datetime.utcnow().isoformat()
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        user_id = str(uuid.uuid4())
+        now = datetime.datetime.utcnow().isoformat()
 
-    user = {
-        "id": user_id,
-        "email": email,
-        "password_hash": hashed,
-        "full_name": full_name,
-        "role": role,
-        "department": department,
-        "created_at": now,
-    }
-    supabase.table("users").insert(user).execute()
+        user = {
+            "id": user_id,
+            "email": email,
+            "password_hash": hashed,
+            "full_name": full_name,
+            "role": role,
+            "department": department,
+            "created_at": now,
+        }
+        supabase.table("users").insert(user).execute()
 
-    token = create_token(user_id, role)
-    user.pop("password_hash")
-    return jsonify({"user": user, "token": token}), 201
+        token = create_token(user_id, role)
+        user.pop("password_hash")
+        return jsonify({"user": user, "token": token}), 201
+    except Exception as e:
+        err_str = str(e)
+        if "PGRST205" in err_str or "schema cache" in err_str:
+            return jsonify({"error": "Database tables not set up yet. Please run the SQL setup script in your Supabase SQL Editor."}), 503
+        return jsonify({"error": f"Registration failed: {err_str}"}), 500
 
 
 @app.route("/auth/login", methods=["POST"])

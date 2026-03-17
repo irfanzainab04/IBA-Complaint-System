@@ -1,0 +1,19 @@
+packages:
+  "framer-motion": "For page transitions and smooth UI animations"
+  "recharts": "For rendering beautiful dashboard statistics charts"
+  "date-fns": "For formatting timestamps into human-readable relative formats"
+  "react-hook-form": "For robust form state management and validation"
+  "@hookform/resolvers": "For integrating Zod validation with react-hook-form"
+
+images:
+  - path: "artifacts/work-order-system/public/images/login-bg.png"
+    description: "Abstract soft gradient mesh in deep maroon and white, professional corporate aesthetic, subtle geometric lines"
+    aspect_ratio: "16:9"
+  - path: "artifacts/work-order-system/public/images/logo-icon.png"
+    description: "Minimalist modern geometric icon representing maintenance, tools, or buildings, deep maroon color on transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - Using generated hooks from @workspace/api-client-react as specified
+  - Added fetch interceptor to inject localStorage JWT token into all /api requests
+  - Assuming Shadcn UI components are pre-installed in src/components/ui/

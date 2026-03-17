@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Work Order Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: work-orders
+    description: Work order management
+  - name: notifications
+    description: Notifications
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,369 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout user
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [student, faculty, admin, technician]
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /work-orders:
+    get:
+      operationId: listWorkOrders
+      tags: [work-orders]
+      summary: List work orders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, assigned, in_progress, complete, closed]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, urgent]
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of work orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkOrder"
+
+    post:
+      operationId: createWorkOrder
+      tags: [work-orders]
+      summary: Create a new work order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkOrderRequest"
+      responses:
+        "201":
+          description: Work order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /work-orders/{id}:
+    get:
+      operationId: getWorkOrder
+      tags: [work-orders]
+      summary: Get a work order by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Work order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+        "404":
+          description: Not found
+
+    patch:
+      operationId: updateWorkOrder
+      tags: [work-orders]
+      summary: Update a work order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkOrderRequest"
+      responses:
+        "200":
+          description: Work order updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /work-orders/{id}/approve:
+    post:
+      operationId: approveWorkOrder
+      tags: [work-orders]
+      summary: Approve a work order (supervisor)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /work-orders/{id}/reject:
+    post:
+      operationId: rejectWorkOrder
+      tags: [work-orders]
+      summary: Reject a work order (supervisor)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectRequest"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /work-orders/{id}/assign:
+    post:
+      operationId: assignWorkOrder
+      tags: [work-orders]
+      summary: Assign work order to technician
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRequest"
+      responses:
+        "200":
+          description: Assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /work-orders/{id}/status:
+    patch:
+      operationId: updateWorkOrderStatus
+      tags: [work-orders]
+      summary: Update work order status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdateRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /work-orders/{id}/comments:
+    get:
+      operationId: getWorkOrderComments
+      tags: [work-orders]
+      summary: Get comments for a work order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comments list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+
+    post:
+      operationId: addComment
+      tags: [work-orders]
+      summary: Add comment to work order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCommentRequest"
+      responses:
+        "201":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: Get notifications for current user
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked as read
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [work-orders]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +401,219 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [student, faculty, admin, technician]
+        department:
+          type: string
+      required: [email, password, full_name, role]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required: [user, token]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [student, faculty, admin, technician]
+        department:
+          type: string
+        created_at:
+          type: string
+      required: [id, email, full_name, role]
+
+    WorkOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [electrical, plumbing, it, lab_equipment, safety, general]
+        location:
+          type: string
+        building:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+        status:
+          type: string
+          enum: [open, assigned, in_progress, complete, closed]
+        requester_id:
+          type: string
+        requester_name:
+          type: string
+        assigned_to_id:
+          type: string
+        assigned_to_name:
+          type: string
+        rejection_reason:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      required: [id, title, description, category, location, priority, status, requester_id, created_at]
+
+    CreateWorkOrderRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [electrical, plumbing, it, lab_equipment, safety, general]
+        location:
+          type: string
+        building:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+      required: [title, description, category, location, priority]
+
+    UpdateWorkOrderRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+        building:
+          type: string
+        priority:
+          type: string
+
+    RejectRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+      required: [reason]
+
+    AssignRequest:
+      type: object
+      properties:
+        technician_id:
+          type: string
+      required: [technician_id]
+
+    StatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, assigned, in_progress, complete, closed]
+        notes:
+          type: string
+      required: [status]
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        work_order_id:
+          type: string
+        author_id:
+          type: string
+        author_name:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string
+      required: [id, work_order_id, author_id, content, created_at]
+
+    AddCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+      required: [content]
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+        work_order_id:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+      required: [id, user_id, message, type, is_read, created_at]
+
+    DashboardStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        open:
+          type: integer
+        assigned:
+          type: integer
+        in_progress:
+          type: integer
+        complete:
+          type: integer
+        closed:
+          type: integer
+        urgent:
+          type: integer
+        by_category:
+          type: object
+          additionalProperties:
+            type: integer
+      required: [total, open, assigned, in_progress, complete, closed, urgent]

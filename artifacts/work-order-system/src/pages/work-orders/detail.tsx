@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, MapPin, Building, Tag, Calendar, User as UserIcon, MessageSquare, Send, CheckCircle, XCircle, Wrench } from "lucide-react";
+import { Loader2, ArrowLeft, MapPin, Building, Tag, Calendar, User as UserIcon, MessageSquare, Send, CheckCircle, XCircle, Wrench, AlertCircle } from "lucide-react";
 
 export default function WorkOrderDetail() {
   const { id } = useParams<{ id: string }>();

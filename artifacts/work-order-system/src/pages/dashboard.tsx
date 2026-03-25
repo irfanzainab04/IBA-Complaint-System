@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { ClipboardList, Clock, CheckCircle2, XCircle, ArrowRight, Plus, Building2, MapPin, Tag, AlertCircle } from "lucide-react";
+import { ClipboardList, Clock, CheckCircle2, XCircle, Plus, Building2, MapPin, Tag, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +72,7 @@ export default function Dashboard() {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-8 bg-muted rounded w-64"></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-muted rounded-2xl"></div>)}
         </div>
         <div className="h-96 bg-muted rounded-2xl"></div>
@@ -92,6 +92,7 @@ export default function Dashboard() {
     { title: "Open", value: stats?.open || 0, icon: AlertCircle, color: "text-amber-600", bg: "bg-amber-600/10" },
     { title: "In Progress", value: stats?.in_progress || 0, icon: Clock, color: "text-purple-600", bg: "bg-purple-600/10" },
     { title: "Completed", value: stats?.completed || 0, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-600/10" },
+    { title: "Rejected", value: (stats as any)?.rejected || 0, icon: XCircle, color: "text-red-600", bg: "bg-red-600/10" },
   ];
 
   return (
@@ -112,7 +113,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
         {statCards.map((stat, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
             <Card className="rounded-2xl border-none shadow-md hover:shadow-lg transition-shadow">

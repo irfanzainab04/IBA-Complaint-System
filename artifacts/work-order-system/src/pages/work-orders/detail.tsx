@@ -34,17 +34,37 @@ export default function WorkOrderDetail() {
   const { data: order, isLoading: isOrderLoading } = useGetWorkOrder(id);
   const { data: comments, isLoading: isCommentsLoading } = useGetWorkOrderComments(id);
 
+  const commentsQueryKey = [`/api/work-orders/${id}/comments`];
+
   const invalidateQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/work-orders", id] });
+    queryClient.invalidateQueries({ queryKey: [`/api/work-orders/${id}`] });
     queryClient.invalidateQueries({ queryKey: ["/api/work-orders"] });
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
   };
 
   const addComment = useAddComment({
     mutation: {
-      onSuccess: () => {
+      onMutate: async (variables) => {
+        await queryClient.cancelQueries({ queryKey: commentsQueryKey });
+        const previousComments = queryClient.getQueryData(commentsQueryKey);
+        const optimistic = {
+          id: `temp-${Date.now()}`,
+          work_order_id: id,
+          author_id: user?.id,
+          author_name: user?.full_name ?? "You",
+          content: (variables.data as any).content,
+          created_at: new Date().toISOString(),
+        };
+        queryClient.setQueryData(commentsQueryKey, (old: any[] = []) => [...old, optimistic]);
         setCommentText("");
-        queryClient.invalidateQueries({ queryKey: ["/api/work-orders", id, "comments"] });
+        return { previousComments };
+      },
+      onError: (_err, _vars, context: any) => {
+        queryClient.setQueryData(commentsQueryKey, context?.previousComments);
+        toast({ variant: "destructive", title: "Error", description: "Failed to post comment." });
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: commentsQueryKey });
       }
     }
   });
@@ -54,13 +74,20 @@ export default function WorkOrderDetail() {
       onSuccess: () => {
         setRejectOpen(false);
         setRejectReason("");
-        toast({ title: "Work Order Rejected", description: "The work order has been successfully rejected." });
+        toast({ title: "Work Order Rejected", description: "The work order has been closed and the requester notified." });
         invalidateQueries();
       }
     }
   });
 
-  const statusMut = useUpdateWorkOrderStatus({ mutation: { onSuccess: invalidateQueries } });
+  const statusMut = useUpdateWorkOrderStatus({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Status Updated", description: "The work order has been marked as complete." });
+        invalidateQueries();
+      }
+    }
+  });
 
   const handleAssign = async () => {
     if (!techName.trim()) return;
@@ -92,6 +119,7 @@ export default function WorkOrderDetail() {
 
   const isAdmin = user?.role === 'admin';
   const isTech = user?.role === 'technician';
+  const isClosed = order.status === 'rejected' || order.status === 'completed';
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -108,115 +136,128 @@ export default function WorkOrderDetail() {
           </div>
         </div>
 
-        {/* ACTION BUTTONS */}
-        <div className="flex gap-3 flex-wrap">
-          {/* Admin: Accept (assign) + Reject for open orders */}
-          {isAdmin && order.status === 'open' && (
-            <>
-              {/* Accept → opens assign dialog */}
-              <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setTechName(""); }}>
-                <DialogTrigger asChild>
-                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
-                    <CheckCircle className="w-4 h-4 mr-2" /> Accept & Assign
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="rounded-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Assign Technician</DialogTitle>
-                  </DialogHeader>
-                  <div className="py-4 space-y-3">
-                    <label className="text-sm font-semibold block">Technician Name</label>
-                    <Input
-                      value={techName}
-                      onChange={e => setTechName(e.target.value)}
-                      placeholder="Enter technician's full name..."
-                      className="rounded-xl h-12"
-                      onKeyDown={e => e.key === 'Enter' && handleAssign()}
-                    />
-                    <p className="text-xs text-muted-foreground">The work order will move to <strong>In Progress</strong> once assigned.</p>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setAssignOpen(false)} className="rounded-xl">Cancel</Button>
-                    <Button onClick={handleAssign} disabled={!techName.trim() || isAssigning} className="rounded-xl">
-                      {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign & Start"}
+        {/* ACTION BUTTONS — hidden for closed/rejected orders */}
+        {!isClosed && (
+          <div className="flex gap-3 flex-wrap">
+            {/* Admin: Accept (assign) + Reject for open orders */}
+            {isAdmin && order.status === 'open' && (
+              <>
+                <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setTechName(""); }}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
+                      <CheckCircle className="w-4 h-4 mr-2" /> Accept & Assign
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Assign Technician</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-3">
+                      <label className="text-sm font-semibold block">Technician Name</label>
+                      <Input
+                        value={techName}
+                        onChange={e => setTechName(e.target.value)}
+                        placeholder="Enter technician's full name..."
+                        className="rounded-xl h-12"
+                        onKeyDown={e => e.key === 'Enter' && handleAssign()}
+                      />
+                      <p className="text-xs text-muted-foreground">The work order will move to <strong>In Progress</strong> once assigned.</p>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setAssignOpen(false)} className="rounded-xl">Cancel</Button>
+                      <Button onClick={handleAssign} disabled={!techName.trim() || isAssigning} className="rounded-xl">
+                        {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign & Start"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
-              {/* Reject */}
-              <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="destructive" className="rounded-xl shadow-md">
-                    <XCircle className="w-4 h-4 mr-2" /> Reject
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="rounded-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Reject Work Order</DialogTitle>
-                  </DialogHeader>
-                  <div className="py-4">
-                    <label className="text-sm font-semibold mb-2 block">Reason for rejection</label>
-                    <Textarea
-                      value={rejectReason}
-                      onChange={e => setRejectReason(e.target.value)}
-                      placeholder="Please explain why this request is being rejected..."
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setRejectOpen(false)} className="rounded-xl">Cancel</Button>
-                    <Button variant="destructive" onClick={() => rejectMut.mutate({ id, data: { reason: rejectReason } })} disabled={!rejectReason || rejectMut.isPending} className="rounded-xl">
-                      {rejectMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Reject"}
+                <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive" className="rounded-xl shadow-md">
+                      <XCircle className="w-4 h-4 mr-2" /> Reject
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
+                  </DialogTrigger>
+                  <DialogContent className="rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Reject Work Order</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <label className="text-sm font-semibold mb-2 block">Reason for rejection</label>
+                      <Textarea
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        placeholder="Please explain why this request is being rejected..."
+                        className="rounded-xl"
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setRejectOpen(false)} className="rounded-xl">Cancel</Button>
+                      <Button variant="destructive" onClick={() => rejectMut.mutate({ id, data: { reason: rejectReason } })} disabled={!rejectReason || rejectMut.isPending} className="rounded-xl">
+                        {rejectMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Reject"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
 
-          {/* Admin: Reassign when in_progress */}
-          {isAdmin && order.status === 'in_progress' && (
-            <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setTechName(""); }}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="rounded-xl shadow-md border-primary/30">
-                  <Wrench className="w-4 h-4 mr-2" /> Reassign Technician
+            {/* Admin: Reassign + Mark Complete when in_progress */}
+            {isAdmin && order.status === 'in_progress' && (
+              <>
+                <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setTechName(""); }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="rounded-xl shadow-md border-primary/30">
+                      <Wrench className="w-4 h-4 mr-2" /> Reassign Technician
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Reassign Technician</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-3">
+                      {order.assigned_to_name && (
+                        <p className="text-sm text-muted-foreground">Currently assigned to: <strong>{order.assigned_to_name}</strong></p>
+                      )}
+                      <label className="text-sm font-semibold block">New Technician Name</label>
+                      <Input
+                        value={techName}
+                        onChange={e => setTechName(e.target.value)}
+                        placeholder="Enter technician's full name..."
+                        className="rounded-xl h-12"
+                        onKeyDown={e => e.key === 'Enter' && handleAssign()}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setAssignOpen(false)} className="rounded-xl">Cancel</Button>
+                      <Button onClick={handleAssign} disabled={!techName.trim() || isAssigning} className="rounded-xl">
+                        {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reassign"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Admin: Mark Complete */}
+                <Button
+                  onClick={() => statusMut.mutate({ id, data: { status: 'completed' } })}
+                  disabled={statusMut.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md"
+                >
+                  {statusMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  Mark Complete
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="rounded-2xl">
-                <DialogHeader>
-                  <DialogTitle>Reassign Technician</DialogTitle>
-                </DialogHeader>
-                <div className="py-4 space-y-3">
-                  {order.assigned_to_name && (
-                    <p className="text-sm text-muted-foreground">Currently assigned to: <strong>{order.assigned_to_name}</strong></p>
-                  )}
-                  <label className="text-sm font-semibold block">New Technician Name</label>
-                  <Input
-                    value={techName}
-                    onChange={e => setTechName(e.target.value)}
-                    placeholder="Enter technician's full name..."
-                    className="rounded-xl h-12"
-                    onKeyDown={e => e.key === 'Enter' && handleAssign()}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setAssignOpen(false)} className="rounded-xl">Cancel</Button>
-                  <Button onClick={handleAssign} disabled={!techName.trim() || isAssigning} className="rounded-xl">
-                    {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reassign"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+              </>
+            )}
 
-          {/* Technician: Mark complete */}
-          {isTech && order.status === 'in_progress' && (
-            <Button onClick={() => statusMut.mutate({ id, data: { status: 'completed' } })} disabled={statusMut.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
-              <CheckCircle className="w-4 h-4 mr-2" /> Mark Complete
-            </Button>
-          )}
-        </div>
+            {/* Technician: Mark complete */}
+            {isTech && order.status === 'in_progress' && (
+              <Button onClick={() => statusMut.mutate({ id, data: { status: 'completed' } })} disabled={statusMut.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
+                {statusMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                Mark Complete
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -254,7 +295,7 @@ export default function WorkOrderDetail() {
                   <div className="p-8 text-center text-muted-foreground text-sm">No comments yet.</div>
                 ) : (
                   comments?.map(comment => (
-                    <div key={comment.id} className="p-6">
+                    <div key={comment.id} className={`p-6 ${String(comment.id).startsWith('temp-') ? 'opacity-60' : ''}`}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-bold text-sm text-foreground">{comment.author_name}</span>
                         <span className="text-xs text-muted-foreground">{format(new Date(comment.created_at), 'MMM d, yyyy h:mm a')}</span>
@@ -266,7 +307,10 @@ export default function WorkOrderDetail() {
               </div>
               <div className="p-4 bg-muted/20 border-t border-border/50">
                 <form
-                  onSubmit={(e) => { e.preventDefault(); if (commentText.trim()) addComment.mutate({ id, data: { content: commentText } }); }}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (commentText.trim()) addComment.mutate({ id, data: { content: commentText } });
+                  }}
                   className="flex gap-3"
                 >
                   <Input

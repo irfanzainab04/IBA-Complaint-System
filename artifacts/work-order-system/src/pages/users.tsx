@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Search, CheckCircle, Clock } from "lucide-react";
+import { Loader2, Users, Search, CheckCircle, XCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 const roleColors: Record<string, string> = {
@@ -22,7 +22,7 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const { data: users, isLoading } = useListUsers({} as any);
 
@@ -36,7 +36,7 @@ export default function UsersPage() {
   const approvedUsers = filteredUsers.filter((u: any) => !(u.role === 'admin' && u.is_approved === false));
 
   const handleApprove = async (userId: string, userName: string) => {
-    setApprovingId(userId);
+    setLoadingId(userId + '-approve');
     try {
       const response = await fetch(`/api/users/${userId}/approve`, {
         method: 'POST',
@@ -52,7 +52,27 @@ export default function UsersPage() {
     } catch {
       toast({ variant: "destructive", title: "Error", description: "Failed to approve account." });
     }
-    setApprovingId(null);
+    setLoadingId(null);
+  };
+
+  const handleReject = async (userId: string, userName: string) => {
+    setLoadingId(userId + '-reject');
+    try {
+      const response = await fetch(`/api/users/${userId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        toast({ title: "Account Rejected", description: `${userName}'s administrator request has been rejected and the account removed.` });
+        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      } else {
+        const err = await response.json();
+        toast({ variant: "destructive", title: "Error", description: err.error || "Failed to reject account." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Failed to reject account." });
+    }
+    setLoadingId(null);
   };
 
   if (currentUser?.role !== 'admin') {
@@ -81,21 +101,31 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {pendingAdmins.map((u: any) => (
-              <div key={u.id} className="flex items-center justify-between bg-white rounded-xl p-4 border border-amber-200">
-                <div>
+              <div key={u.id} className="flex items-center justify-between bg-white rounded-xl p-4 border border-amber-200 gap-4">
+                <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground">{u.full_name}</p>
-                  <p className="text-sm text-muted-foreground">{u.email}</p>
+                  <p className="text-sm text-muted-foreground truncate">{u.email}</p>
                   {u.created_at && (
                     <p className="text-xs text-muted-foreground mt-0.5">Registered {format(new Date(u.created_at), 'MMM d, yyyy')}</p>
                   )}
                 </div>
-                <Button
-                  onClick={() => handleApprove(u.id, u.full_name)}
-                  disabled={approvingId === u.id}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
-                >
-                  {approvingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve</>}
-                </Button>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleReject(u.id, u.full_name)}
+                    disabled={loadingId !== null}
+                    className="rounded-xl"
+                  >
+                    {loadingId === u.id + '-reject' ? <Loader2 className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4 mr-1.5" /> Reject</>}
+                  </Button>
+                  <Button
+                    onClick={() => handleApprove(u.id, u.full_name)}
+                    disabled={loadingId !== null}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
+                  >
+                    {loadingId === u.id + '-approve' ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1.5" /> Approve</>}
+                  </Button>
+                </div>
               </div>
             ))}
           </CardContent>

@@ -6,7 +6,7 @@ import { useCreateWorkOrder } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ArrowLeft, Building2, MapPin, Tag, AlertCircle } from "lucide-react";
@@ -16,9 +16,9 @@ import { useToast } from "@/hooks/use-toast";
 const createSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
   description: z.string().min(10, "Please provide more details"),
-  category: z.enum(["electrical", "plumbing", "it", "lab_equipment", "safety", "general"]),
+  category: z.enum(["electrical", "plumbing", "it", "lab_equipment", "general"]),
+  building: z.string().min(1, "Building is required"),
   location: z.string().min(2, "Location details are required"),
-  building: z.string().optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]),
 });
 
@@ -33,8 +33,8 @@ export default function CreateWorkOrder() {
       title: "",
       description: "",
       category: "general",
-      location: "",
       building: "",
+      location: "",
       priority: "medium",
     },
   });
@@ -74,7 +74,7 @@ export default function CreateWorkOrder() {
         <CardContent className="p-6 sm:p-8">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              
+
               <FormField
                 control={form.control}
                 name="title"
@@ -95,7 +95,7 @@ export default function CreateWorkOrder() {
                   name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold flex items-center gap-2"><Tag className="w-4 h-4 text-muted-foreground"/> Category</FormLabel>
+                      <FormLabel className="font-semibold flex items-center gap-2"><Tag className="w-4 h-4 text-muted-foreground" /> Category</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="h-12 rounded-xl">
@@ -107,7 +107,6 @@ export default function CreateWorkOrder() {
                           <SelectItem value="plumbing">Plumbing</SelectItem>
                           <SelectItem value="it">IT / Network</SelectItem>
                           <SelectItem value="lab_equipment">Lab Equipment</SelectItem>
-                          <SelectItem value="safety">Safety / Hazard</SelectItem>
                           <SelectItem value="general">General Maintenance</SelectItem>
                         </SelectContent>
                       </Select>
@@ -121,7 +120,7 @@ export default function CreateWorkOrder() {
                   name="priority"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold flex items-center gap-2"><AlertCircle className="w-4 h-4 text-muted-foreground"/> Priority Level</FormLabel>
+                      <FormLabel className="font-semibold flex items-center gap-2"><AlertCircle className="w-4 h-4 text-muted-foreground" /> Priority Level</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="h-12 rounded-xl">
@@ -147,7 +146,7 @@ export default function CreateWorkOrder() {
                   name="building"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold flex items-center gap-2"><Building2 className="w-4 h-4 text-muted-foreground"/> Building (Optional)</FormLabel>
+                      <FormLabel className="font-semibold flex items-center gap-2"><Building2 className="w-4 h-4 text-muted-foreground" /> Building</FormLabel>
                       <FormControl>
                         <Input placeholder="e.g. Science Complex" className="h-11 rounded-lg bg-white" {...field} />
                       </FormControl>
@@ -161,7 +160,7 @@ export default function CreateWorkOrder() {
                   name="location"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-muted-foreground"/> Specific Location</FormLabel>
+                      <FormLabel className="font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-muted-foreground" /> Specific Location</FormLabel>
                       <FormControl>
                         <Input placeholder="e.g. Room 402, North Wall" className="h-11 rounded-lg bg-white" {...field} />
                       </FormControl>
@@ -178,10 +177,10 @@ export default function CreateWorkOrder() {
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Detailed Description</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Please describe the issue in detail, including when it started and any troubleshooting attempted." 
-                        className="min-h-[120px] rounded-xl resize-none" 
-                        {...field} 
+                      <Textarea
+                        placeholder="Please describe the issue in detail, including when it started and any troubleshooting attempted."
+                        className="min-h-[120px] rounded-xl resize-none"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -193,8 +192,8 @@ export default function CreateWorkOrder() {
                 <Button variant="outline" type="button" asChild className="rounded-xl h-12 px-6">
                   <Link href="/work-orders">Cancel</Link>
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="rounded-xl h-12 px-8 shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-transform"
                   disabled={createMutation.isPending}
                 >

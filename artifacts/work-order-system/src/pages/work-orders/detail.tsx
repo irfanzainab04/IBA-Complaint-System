@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { 
-  useGetWorkOrder, useGetWorkOrderComments, useAddComment, 
-  useApproveWorkOrder, useRejectWorkOrder, useAssignWorkOrder, 
-  useUpdateWorkOrderStatus, useListUsers 
+import {
+  useGetWorkOrder, useGetWorkOrderComments, useAddComment,
+  useRejectWorkOrder, useUpdateWorkOrderStatus
 } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { getStatusColor, getPriorityColor } from "./list";
+import { getStatusColor, getPriorityColor, getStatusLabel } from "./list";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ArrowLeft, MapPin, Building, Tag, Calendar, User as UserIcon, MessageSquare, Send, CheckCircle, XCircle, Wrench, AlertCircle } from "lucide-react";
 
 export default function WorkOrderDetail() {
@@ -25,16 +23,16 @@ export default function WorkOrderDetail() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [commentText, setCommentText] = useState("");
   const [rejectReason, setRejectReason] = useState("");
-  const [selectedTech, setSelectedTech] = useState("");
+  const [techName, setTechName] = useState("");
   const [rejectOpen, setRejectOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const { data: order, isLoading: isOrderLoading } = useGetWorkOrder(id);
   const { data: comments, isLoading: isCommentsLoading } = useGetWorkOrderComments(id);
-  const { data: technicians } = useListUsers({ role: 'technician' }, { query: { enabled: user?.role === 'admin' } });
 
   const invalidateQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/work-orders", id] });
@@ -51,18 +49,42 @@ export default function WorkOrderDetail() {
     }
   });
 
-  const approveMut = useApproveWorkOrder({ mutation: { onSuccess: invalidateQueries } });
-  const rejectMut = useRejectWorkOrder({ 
-    mutation: { 
-      onSuccess: () => { setRejectOpen(false); invalidateQueries(); } 
-    } 
+  const rejectMut = useRejectWorkOrder({
+    mutation: {
+      onSuccess: () => {
+        setRejectOpen(false);
+        setRejectReason("");
+        toast({ title: "Work Order Rejected", description: "The work order has been successfully rejected." });
+        invalidateQueries();
+      }
+    }
   });
-  const assignMut = useAssignWorkOrder({ 
-    mutation: { 
-      onSuccess: () => { setAssignOpen(false); invalidateQueries(); } 
-    } 
-  });
+
   const statusMut = useUpdateWorkOrderStatus({ mutation: { onSuccess: invalidateQueries } });
+
+  const handleAssign = async () => {
+    if (!techName.trim()) return;
+    setIsAssigning(true);
+    try {
+      const response = await fetch(`/api/work-orders/${id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ technician_name: techName.trim() })
+      });
+      if (response.ok) {
+        setAssignOpen(false);
+        setTechName("");
+        toast({ title: "Technician Assigned", description: `Work order assigned to ${techName.trim()} and is now In Progress.` });
+        invalidateQueries();
+      } else {
+        const err = await response.json();
+        toast({ variant: "destructive", title: "Error", description: err.error || "Failed to assign technician." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Failed to assign technician." });
+    }
+    setIsAssigning(false);
+  };
 
   if (isOrderLoading || !order) {
     return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -81,18 +103,48 @@ export default function WorkOrderDetail() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-display font-bold text-foreground">Request #{order.id.slice(0, 8)}</h1>
             <Badge variant="outline" className={`${getStatusColor(order.status)} capitalize text-sm px-3 py-1 rounded-full`}>
-              {order.status.replace('_', ' ')}
+              {getStatusLabel(order.status)}
             </Badge>
           </div>
         </div>
-        
+
         {/* ACTION BUTTONS */}
         <div className="flex gap-3 flex-wrap">
+          {/* Admin: Accept (assign) + Reject for open orders */}
           {isAdmin && order.status === 'open' && (
             <>
-              <Button onClick={() => approveMut.mutate({ id })} disabled={approveMut.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
-                <CheckCircle className="w-4 h-4 mr-2" /> Approve
-              </Button>
+              {/* Accept → opens assign dialog */}
+              <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setTechName(""); }}>
+                <DialogTrigger asChild>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
+                    <CheckCircle className="w-4 h-4 mr-2" /> Accept & Assign
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Assign Technician</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4 space-y-3">
+                    <label className="text-sm font-semibold block">Technician Name</label>
+                    <Input
+                      value={techName}
+                      onChange={e => setTechName(e.target.value)}
+                      placeholder="Enter technician's full name..."
+                      className="rounded-xl h-12"
+                      onKeyDown={e => e.key === 'Enter' && handleAssign()}
+                    />
+                    <p className="text-xs text-muted-foreground">The work order will move to <strong>In Progress</strong> once assigned.</p>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setAssignOpen(false)} className="rounded-xl">Cancel</Button>
+                    <Button onClick={handleAssign} disabled={!techName.trim() || isAssigning} className="rounded-xl">
+                      {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign & Start"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Reject */}
               <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
                 <DialogTrigger asChild>
                   <Button variant="destructive" className="rounded-xl shadow-md">
@@ -105,16 +157,16 @@ export default function WorkOrderDetail() {
                   </DialogHeader>
                   <div className="py-4">
                     <label className="text-sm font-semibold mb-2 block">Reason for rejection</label>
-                    <Textarea 
-                      value={rejectReason} 
-                      onChange={e => setRejectReason(e.target.value)} 
-                      placeholder="Please explain why this request is being rejected..." 
+                    <Textarea
+                      value={rejectReason}
+                      onChange={e => setRejectReason(e.target.value)}
+                      placeholder="Please explain why this request is being rejected..."
                       className="rounded-xl"
                     />
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setRejectOpen(false)} className="rounded-xl">Cancel</Button>
-                    <Button variant="destructive" onClick={() => rejectMut.mutate({ id, data: { reason: rejectReason }})} disabled={!rejectReason || rejectMut.isPending} className="rounded-xl">
+                    <Button variant="destructive" onClick={() => rejectMut.mutate({ id, data: { reason: rejectReason } })} disabled={!rejectReason || rejectMut.isPending} className="rounded-xl">
                       {rejectMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Reject"}
                     </Button>
                   </DialogFooter>
@@ -123,47 +175,44 @@ export default function WorkOrderDetail() {
             </>
           )}
 
-          {isAdmin && ['open', 'assigned'].includes(order.status) && (
-            <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+          {/* Admin: Reassign when in_progress */}
+          {isAdmin && order.status === 'in_progress' && (
+            <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setTechName(""); }}>
               <DialogTrigger asChild>
-                <Button variant="default" className="rounded-xl shadow-md">
-                  <Wrench className="w-4 h-4 mr-2" /> Assign Technician
+                <Button variant="outline" className="rounded-xl shadow-md border-primary/30">
+                  <Wrench className="w-4 h-4 mr-2" /> Reassign Technician
                 </Button>
               </DialogTrigger>
               <DialogContent className="rounded-2xl">
                 <DialogHeader>
-                  <DialogTitle>Assign to Technician</DialogTitle>
+                  <DialogTitle>Reassign Technician</DialogTitle>
                 </DialogHeader>
-                <div className="py-4">
-                  <Select value={selectedTech} onValueChange={setSelectedTech}>
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="Select a technician" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {technicians?.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="py-4 space-y-3">
+                  {order.assigned_to_name && (
+                    <p className="text-sm text-muted-foreground">Currently assigned to: <strong>{order.assigned_to_name}</strong></p>
+                  )}
+                  <label className="text-sm font-semibold block">New Technician Name</label>
+                  <Input
+                    value={techName}
+                    onChange={e => setTechName(e.target.value)}
+                    placeholder="Enter technician's full name..."
+                    className="rounded-xl h-12"
+                    onKeyDown={e => e.key === 'Enter' && handleAssign()}
+                  />
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setAssignOpen(false)} className="rounded-xl">Cancel</Button>
-                  <Button onClick={() => assignMut.mutate({ id, data: { technician_id: selectedTech }})} disabled={!selectedTech || assignMut.isPending} className="rounded-xl">
-                    {assignMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign"}
+                  <Button onClick={handleAssign} disabled={!techName.trim() || isAssigning} className="rounded-xl">
+                    {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reassign"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           )}
 
-          {isTech && order.status === 'assigned' && (
-            <Button onClick={() => statusMut.mutate({ id, data: { status: 'in_progress' }})} disabled={statusMut.isPending} className="rounded-xl shadow-md">
-              Start Work
-            </Button>
-          )}
-
+          {/* Technician: Mark complete */}
           {isTech && order.status === 'in_progress' && (
-            <Button onClick={() => statusMut.mutate({ id, data: { status: 'complete' }})} disabled={statusMut.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
+            <Button onClick={() => statusMut.mutate({ id, data: { status: 'completed' } })} disabled={statusMut.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
               <CheckCircle className="w-4 h-4 mr-2" /> Mark Complete
             </Button>
           )}
@@ -171,7 +220,7 @@ export default function WorkOrderDetail() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* MAIN COL */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="rounded-2xl shadow-sm border-border/50">
@@ -216,12 +265,12 @@ export default function WorkOrderDetail() {
                 )}
               </div>
               <div className="p-4 bg-muted/20 border-t border-border/50">
-                <form 
-                  onSubmit={(e) => { e.preventDefault(); if(commentText.trim()) addComment.mutate({ id, data: { content: commentText }}); }}
+                <form
+                  onSubmit={(e) => { e.preventDefault(); if (commentText.trim()) addComment.mutate({ id, data: { content: commentText } }); }}
                   className="flex gap-3"
                 >
-                  <Input 
-                    placeholder="Add an update or ask a question..." 
+                  <Input
+                    placeholder="Add an update or ask a question..."
                     className="h-11 rounded-xl bg-white"
                     value={commentText}
                     onChange={e => setCommentText(e.target.value)}
@@ -249,7 +298,7 @@ export default function WorkOrderDetail() {
                   <p className="font-medium capitalize">{order.category.replace('_', ' ')}</p>
                 </div>
               </div>
-              
+
               <div className="flex gap-4 items-start">
                 <div className="mt-0.5 bg-primary/10 p-2 rounded-lg text-primary"><AlertCircle className="w-4 h-4" /></div>
                 <div>
@@ -291,12 +340,12 @@ export default function WorkOrderDetail() {
                   <p className="font-medium">{order.requester_name}</p>
                 </div>
               </div>
-              
+
               {order.assigned_to_name && (
                 <div className="flex gap-4 items-start pt-4 border-t border-border/50">
                   <div className="mt-0.5 bg-blue-100 p-2 rounded-lg text-blue-700"><Wrench className="w-4 h-4" /></div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Assigned Tech</p>
+                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Assigned Technician</p>
                     <p className="font-medium text-blue-800">{order.assigned_to_name}</p>
                   </div>
                 </div>

@@ -14,9 +14,9 @@ import WorkOrdersList from "./pages/work-orders/list";
 import CreateWorkOrder from "./pages/work-orders/create";
 import WorkOrderDetail from "./pages/work-orders/detail";
 import Notifications from "./pages/notifications";
+import UsersPage from "./pages/users";
 import NotFound from "@/pages/not-found";
 
-// Initialize the fetch interceptor so @workspace/api-client-react hooks send the token
 setupFetchInterceptor();
 
 const queryClient = new QueryClient({
@@ -39,7 +39,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, isLoading, location, setLocation]);
 
   if (isLoading || (!isAuthenticated && location !== "/login" && location !== "/register")) {
-    return null; // Layout handles the loading spinner
+    return null;
   }
 
   return <>{children}</>;
@@ -55,6 +55,7 @@ function ProtectedRoutes() {
           <Route path="/work-orders/new" component={CreateWorkOrder} />
           <Route path="/work-orders/:id" component={WorkOrderDetail} />
           <Route path="/notifications" component={Notifications} />
+          <Route path="/users" component={UsersPage} />
           <Route component={NotFound} />
         </Switch>
       </AuthGuard>

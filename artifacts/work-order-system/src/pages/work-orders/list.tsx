@@ -8,15 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, FilterX, Clock, MapPin, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth";
 
 export function getStatusColor(status: string) {
   switch (status) {
     case 'open': return "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200";
-    case 'assigned': return "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200";
     case 'in_progress': return "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200";
-    case 'complete': return "bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200";
-    case 'closed': return "bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200";
+    case 'completed': return "bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200";
+    case 'rejected': return "bg-red-100 text-red-800 border-red-200 hover:bg-red-200";
     default: return "bg-gray-100 text-gray-800 border-gray-200";
+  }
+}
+
+export function getStatusLabel(status: string) {
+  switch (status) {
+    case 'open': return 'Open';
+    case 'in_progress': return 'In Progress';
+    case 'completed': return 'Completed';
+    case 'rejected': return 'Rejected';
+    default: return status;
   }
 }
 
@@ -31,21 +41,24 @@ export function getPriorityColor(priority: string) {
 }
 
 export default function WorkOrdersList() {
+  const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
   const { data: workOrders, isLoading } = useListWorkOrders(
-    { 
+    {
       ...(statusFilter !== 'all' && { status: statusFilter as any }),
       ...(priorityFilter !== 'all' && { priority: priorityFilter as any }),
     }
   );
 
-  const filteredOrders = workOrders?.filter(wo => 
-    wo.title.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredOrders = workOrders?.filter(wo =>
+    wo.title.toLowerCase().includes(search.toLowerCase()) ||
     wo.location.toLowerCase().includes(search.toLowerCase())
   ) || [];
+
+  const canCreate = ['student', 'faculty', 'admin'].includes(user?.role || '');
 
   return (
     <div className="space-y-6">
@@ -54,19 +67,21 @@ export default function WorkOrdersList() {
           <h1 className="text-3xl font-display font-bold text-foreground">Work Orders</h1>
           <p className="text-muted-foreground mt-1">Manage and track campus maintenance requests</p>
         </div>
-        <Button asChild className="rounded-xl shadow-md hover:-translate-y-0.5 transition-transform">
-          <Link href="/work-orders/new">
-            <Plus className="w-4 h-4 mr-2" />
-            New Request
-          </Link>
-        </Button>
+        {canCreate && (
+          <Button asChild className="rounded-xl shadow-md hover:-translate-y-0.5 transition-transform">
+            <Link href="/work-orders/new">
+              <Plus className="w-4 h-4 mr-2" />
+              New Request
+            </Link>
+          </Button>
+        )}
       </div>
 
       <Card className="p-4 rounded-2xl shadow-sm border-border/50 flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by title or location..." 
+          <Input
+            placeholder="Search by title or location..."
             className="pl-9 h-11 rounded-xl bg-muted/50"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -80,10 +95,9 @@ export default function WorkOrdersList() {
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="assigned">Assigned</SelectItem>
               <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="complete">Complete</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
           <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -99,9 +113,9 @@ export default function WorkOrdersList() {
             </SelectContent>
           </Select>
           {(statusFilter !== 'all' || priorityFilter !== 'all' || search !== '') && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="h-11 w-11 rounded-xl text-muted-foreground hover:text-destructive"
               onClick={() => { setStatusFilter('all'); setPriorityFilter('all'); setSearch(''); }}
               title="Clear filters"
@@ -134,7 +148,7 @@ export default function WorkOrdersList() {
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-xs font-bold text-muted-foreground">#{order.id.slice(0, 8)}</span>
                       <Badge variant="outline" className={`${getStatusColor(order.status)} capitalize`}>
-                        {order.status.replace('_', ' ')}
+                        {getStatusLabel(order.status)}
                       </Badge>
                       <Badge variant="secondary" className={`${getPriorityColor(order.priority)} capitalize border-transparent`}>
                         {order.priority}

@@ -19,7 +19,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
 def get_json():
-    """Parse JSON body regardless of Content-Type header."""
     return request.get_json(force=True, silent=True) or {}
 
 
@@ -109,10 +108,18 @@ def register():
         password = data.get("password", "")
         full_name = data.get("full_name", "").strip()
         role = data.get("role", "student")
-        department = data.get("department", "")
 
         if not email or not password or not full_name:
             return jsonify({"error": "Missing required fields"}), 400
+
+        if role not in ["student", "faculty", "admin"]:
+            return jsonify({"error": "Invalid role"}), 400
+
+        # Email domain validation
+        if role == "student" and not email.endswith("@khi.iba.edu.pk"):
+            return jsonify({"error": "Student accounts must use a @khi.iba.edu.pk email address."}), 400
+        if role == "faculty" and not email.endswith("@iba.edu.pk"):
+            return jsonify({"error": "Faculty/Staff accounts must use a @iba.edu.pk email address."}), 400
 
         existing = supabase.table("users").select("id").eq("email", email).execute()
         if existing.data:
@@ -122,19 +129,33 @@ def register():
         user_id = str(uuid.uuid4())
         now = datetime.datetime.utcnow().isoformat()
 
+        # Admin approval: auto-approve first admin, others need approval
+        is_approved = True
+        if role == "admin":
+            existing_admins = supabase.table("users").select("id").eq("role", "admin").eq("is_approved", True).execute()
+            is_approved = len(existing_admins.data) == 0
+
         user = {
             "id": user_id,
             "email": email,
             "password_hash": hashed,
             "full_name": full_name,
             "role": role,
-            "department": department,
+            "department": "",
+            "is_approved": is_approved,
             "created_at": now,
         }
         supabase.table("users").insert(user).execute()
 
+        if role == "admin" and not is_approved:
+            return jsonify({
+                "pending_approval": True,
+                "message": "Your administrator account is pending approval by an existing administrator. You will be able to log in once approved."
+            }), 201
+
         token = create_token(user_id, role)
         user.pop("password_hash")
+        user.pop("is_approved", None)
         return jsonify({"user": user, "token": token}), 201
     except Exception as e:
         return db_error_response(e)
@@ -155,8 +176,12 @@ def login():
         if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
             return jsonify({"error": "Invalid credentials"}), 401
 
+        if user.get("role") == "admin" and not user.get("is_approved", True):
+            return jsonify({"error": "Your administrator account is pending approval. Please wait for an existing administrator to approve your account."}), 403
+
         token = create_token(user["id"], user["role"])
         user.pop("password_hash")
+        user.pop("is_approved", None)
         return jsonify({"user": user, "token": token})
     except Exception as e:
         return db_error_response(e)
@@ -174,6 +199,7 @@ def get_me():
     if not user:
         return jsonify({"error": "User not found"}), 404
     user.pop("password_hash", None)
+    user.pop("is_approved", None)
     return jsonify(user)
 
 
@@ -184,11 +210,24 @@ def get_me():
 def list_users():
     try:
         role_filter = request.args.get("role")
-        query = supabase.table("users").select("id, email, full_name, role, department, created_at")
+        query = supabase.table("users").select("id, email, full_name, role, department, is_approved, created_at")
         if role_filter:
             query = query.eq("role", role_filter)
         result = query.execute()
         return jsonify(result.data)
+    except Exception as e:
+        return db_error_response(e)
+
+
+@app.route("/users/<user_id>/approve", methods=["POST"])
+@require_auth
+@require_role("admin")
+def approve_user(user_id):
+    try:
+        result = supabase.table("users").update({"is_approved": True}).eq("id", user_id).execute()
+        if not result.data:
+            return jsonify({"error": "User not found"}), 404
+        return jsonify({"message": "User approved successfully"})
     except Exception as e:
         return db_error_response(e)
 
@@ -256,14 +295,9 @@ def create_work_order():
 
         result = supabase.table("work_orders").insert(work_order).execute()
 
-        admins = supabase.table("users").select("id").eq("role", "admin").execute()
+        admins = supabase.table("users").select("id").eq("role", "admin").eq("is_approved", True).execute()
         for admin in admins.data:
-            add_notification(
-                admin["id"],
-                f"New work order submitted: {work_order['title']}",
-                "new_work_order",
-                wo_id,
-            )
+            add_notification(admin["id"], f"New work order submitted: {work_order['title']}", "new_work_order", wo_id)
 
         return jsonify(result.data[0]), 201
     except Exception as e:
@@ -306,16 +340,12 @@ def approve_work_order(wo_id):
     try:
         now = datetime.datetime.utcnow().isoformat()
         result = supabase.table("work_orders").update({
-            "status": "assigned",
+            "status": "open",
             "updated_at": now,
         }).eq("id", wo_id).execute()
-
         if not result.data:
             return jsonify({"error": "Not found"}), 404
-
-        wo = result.data[0]
-        add_notification(wo["requester_id"], f"Your work order '{wo['title']}' has been approved.", "approved", wo_id)
-        return jsonify(wo)
+        return jsonify(result.data[0])
     except Exception as e:
         return db_error_response(e)
 
@@ -330,7 +360,7 @@ def reject_work_order(wo_id):
         now = datetime.datetime.utcnow().isoformat()
 
         result = supabase.table("work_orders").update({
-            "status": "closed",
+            "status": "rejected",
             "rejection_reason": reason,
             "updated_at": now,
         }).eq("id", wo_id).execute()
@@ -351,16 +381,15 @@ def reject_work_order(wo_id):
 def assign_work_order(wo_id):
     try:
         data = get_json()
-        tech_id = data.get("technician_id")
-        tech = get_user_by_id(tech_id)
-        if not tech:
-            return jsonify({"error": "Technician not found"}), 404
+        tech_name = data.get("technician_name", "").strip()
+        if not tech_name:
+            return jsonify({"error": "Technician name is required"}), 400
 
         now = datetime.datetime.utcnow().isoformat()
         result = supabase.table("work_orders").update({
-            "assigned_to_id": tech_id,
-            "assigned_to_name": tech["full_name"],
-            "status": "assigned",
+            "assigned_to_id": None,
+            "assigned_to_name": tech_name,
+            "status": "in_progress",
             "updated_at": now,
         }).eq("id", wo_id).execute()
 
@@ -368,8 +397,7 @@ def assign_work_order(wo_id):
             return jsonify({"error": "Not found"}), 404
 
         wo = result.data[0]
-        add_notification(tech_id, f"You have been assigned a work order: '{wo['title']}'", "assigned", wo_id)
-        add_notification(wo["requester_id"], f"Your work order '{wo['title']}' has been assigned to {tech['full_name']}.", "assigned", wo_id)
+        add_notification(wo["requester_id"], f"Your work order '{wo['title']}' has been assigned to {tech_name} and is now in progress.", "assigned", wo_id)
         return jsonify(wo)
     except Exception as e:
         return db_error_response(e)
@@ -381,7 +409,7 @@ def update_work_order_status(wo_id):
     try:
         data = get_json()
         new_status = data.get("status")
-        valid_statuses = ["open", "assigned", "in_progress", "complete", "closed"]
+        valid_statuses = ["open", "in_progress", "completed", "rejected"]
         if new_status not in valid_statuses:
             return jsonify({"error": "Invalid status"}), 400
 
@@ -480,10 +508,9 @@ def dashboard_stats():
         stats = {
             "total": len(orders),
             "open": sum(1 for o in orders if o["status"] == "open"),
-            "assigned": sum(1 for o in orders if o["status"] == "assigned"),
             "in_progress": sum(1 for o in orders if o["status"] == "in_progress"),
-            "complete": sum(1 for o in orders if o["status"] == "complete"),
-            "closed": sum(1 for o in orders if o["status"] == "closed"),
+            "completed": sum(1 for o in orders if o["status"] == "completed"),
+            "rejected": sum(1 for o in orders if o["status"] == "rejected"),
             "urgent": sum(1 for o in orders if o["priority"] == "urgent"),
             "by_category": {},
         }

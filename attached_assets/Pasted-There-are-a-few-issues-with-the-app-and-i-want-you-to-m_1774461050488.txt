@@ -1,0 +1,13 @@
+There are a few issues with the app and i want you to make the following changes to fix them.
+1. for the sign up form, remove the technician option from the Role dropdown
+2. Also Remove the Department/Hall field
+3. There is a very dangerous bug present as anyone can sign up as an administrator so to fix this issue when someone signs up as an administrator, their account will need to be approved by a master administrator before they can access the website or use their account.
+4. Also to differentiate between student and faculty, the system should allow student account to be created only if the email end with the format: @khi.iba.edu.pk. for example: xxxx@khi.iba.edu.pk
+Similarly, for Faculty/staff account, the email should end in @iba.edu.pk. for example, xxxx@iba.edu.pk
+5. I want you to remove the create request part from the side bar and instead have a create request button that opens up a work order form on the dashboard
+6. From the work order request form, remove saftey/hazard option from category and make building field mandatory
+7. For the workflow for work order approval, only accept and reject buttons should be there and once the admin clicks accept then there should the assigning a technician part come and if the admin selects reject then a pop should show up indicating the word order was successfully rejected. 
+8. for assigning technician instead of having a dropdown, make it be a text box instead so user can type in the technicians name and also make the technician assigned be reassignable so that admin can edit again whoever is assigned to work order.
+9. In the recent activity section on dashboard i want you to display the priority on the work order cards similar to the way it is in the work order section.
+10. For the status of the work orders, change them so that they are: Open, In progress, Completed & Rejected. Display them on the dashboard accordingly as well. As soon as the admin assigns a technician then the status of work order will change from open to in progress
+11. while admin is signed in, when they navigate to Users (Admin) on the side bar, the page shows 404 error when it should be showing the list of users and admins.

@@ -1,13 +1,12 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { 
-  LayoutDashboard, 
-  ClipboardList, 
-  PlusCircle, 
-  Bell, 
-  Users, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  ClipboardList,
+  Bell,
+  Users,
+  LogOut,
   Menu,
   X,
   User as UserIcon
@@ -26,7 +25,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Fetch badges data
   const { data: notifications } = useListNotifications({ query: { enabled: isAuthenticated } });
   const { data: openOrders } = useListWorkOrders({ status: "open" }, { query: { enabled: isAuthenticated && user?.role === 'admin' } });
 
@@ -50,31 +48,25 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const navItems = [
     { label: "Dashboard", href: "/", icon: LayoutDashboard, show: true },
-    { 
-      label: "Work Orders", 
-      href: "/work-orders", 
-      icon: ClipboardList, 
+    {
+      label: "Work Orders",
+      href: "/work-orders",
+      icon: ClipboardList,
       show: true,
       badge: user?.role === 'admin' && openOrderCount > 0 ? openOrderCount : null
     },
-    { 
-      label: "Create Request", 
-      href: "/work-orders/new", 
-      icon: PlusCircle, 
-      show: ['student', 'faculty', 'admin'].includes(user?.role || '') 
-    },
-    { 
-      label: "Notifications", 
-      href: "/notifications", 
-      icon: Bell, 
+    {
+      label: "Notifications",
+      href: "/notifications",
+      icon: Bell,
       show: true,
       badge: unreadNotifications > 0 ? unreadNotifications : null
     },
-    { 
-      label: "Users (Admin)", 
-      href: "/users", 
-      icon: Users, 
-      show: user?.role === 'admin' 
+    {
+      label: "Users",
+      href: "/users",
+      icon: Users,
+      show: user?.role === 'admin'
     },
   ];
 
@@ -82,9 +74,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen flex bg-[#fdfdfd]">
-      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity"
           onClick={closeSidebar}
         />
@@ -114,13 +105,13 @@ export function AppLayout({ children }: AppLayoutProps) {
             return (
               <Link key={item.href} href={item.href} onClick={closeSidebar} className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium group",
-                isActive 
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-inner" 
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-inner"
                   : "text-sidebar-foreground/80 hover:bg-white/5 hover:text-white"
               )}>
                 <item.icon className={cn("w-5 h-5 transition-transform group-hover:scale-110", isActive ? "text-white" : "text-sidebar-foreground/60")} />
                 {item.label}
-                {item.badge !== null && (
+                {item.badge !== null && item.badge !== undefined && (
                   <Badge variant="secondary" className="ml-auto bg-white text-primary hover:bg-white border-none shadow-sm h-6 min-w-6 flex items-center justify-center">
                     {item.badge}
                   </Badge>
@@ -138,11 +129,11 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
               <div className="overflow-hidden">
                 <p className="font-semibold text-sm text-white truncate">{user?.full_name}</p>
-                <p className="text-xs text-sidebar-foreground/70 capitalize truncate">{user?.role} • {user?.department || 'General'}</p>
+                <p className="text-xs text-sidebar-foreground/70 capitalize truncate">{user?.role}</p>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="w-full justify-start text-sidebar-foreground/80 hover:text-white hover:bg-white/10 transition-colors"
               onClick={() => logout()}
             >

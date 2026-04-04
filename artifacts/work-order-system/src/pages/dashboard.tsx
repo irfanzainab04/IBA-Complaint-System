@@ -43,6 +43,7 @@ export default function Dashboard() {
   const { data: recentOrders, isLoading: ordersLoading } = useListWorkOrders();
 
   const canCreate = ['student', 'faculty', 'admin'].includes(user?.role || '');
+  const isAdmin = user?.role === 'admin';
 
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
@@ -214,7 +215,7 @@ export default function Dashboard() {
                 )}
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 gap-4 ${isAdmin ? "sm:grid-cols-2" : ""}`}>
                 <FormField
                   control={form.control}
                   name="category"
@@ -237,27 +238,29 @@ export default function Dashboard() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-semibold flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5 text-muted-foreground" /> Priority</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select priority" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="low">Low - Routine</SelectItem>
-                          <SelectItem value="medium">Medium - Standard</SelectItem>
-                          <SelectItem value="high">High - Impacting work</SelectItem>
-                          <SelectItem value="urgent">Urgent - Emergency</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {isAdmin && (
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-semibold flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5 text-muted-foreground" /> Priority</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select priority" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="low">Low - Routine</SelectItem>
+                            <SelectItem value="medium">Medium - Standard</SelectItem>
+                            <SelectItem value="high">High - Impacting work</SelectItem>
+                            <SelectItem value="urgent">Urgent - Emergency</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">

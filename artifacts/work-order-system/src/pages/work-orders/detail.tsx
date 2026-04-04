@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetWorkOrder, useGetWorkOrderComments, useAddComment,
-  useRejectWorkOrder, useUpdateWorkOrderStatus
+  useRejectWorkOrder, useUpdateWorkOrderStatus, useUpdateWorkOrder
 } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ArrowLeft, MapPin, Building, Tag, Calendar, User as UserIcon, MessageSquare, Send, CheckCircle, XCircle, Wrench, AlertCircle } from "lucide-react";
 
 export default function WorkOrderDetail() {
@@ -85,6 +86,18 @@ export default function WorkOrderDetail() {
       onSuccess: () => {
         toast({ title: "Status Updated", description: "The work order has been marked as complete." });
         invalidateQueries();
+      }
+    }
+  });
+
+  const updateMut = useUpdateWorkOrder({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Priority Updated", description: "The priority has been updated successfully." });
+        invalidateQueries();
+      },
+      onError: () => {
+        toast({ variant: "destructive", title: "Error", description: "Failed to update priority." });
       }
     }
   });
@@ -345,11 +358,29 @@ export default function WorkOrderDetail() {
 
               <div className="flex gap-4 items-start">
                 <div className="mt-0.5 bg-primary/10 p-2 rounded-lg text-primary"><AlertCircle className="w-4 h-4" /></div>
-                <div>
+                <div className="flex-1">
                   <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Priority</p>
-                  <Badge variant="secondary" className={`${getPriorityColor(order.priority)} capitalize border-transparent mt-0.5`}>
-                    {order.priority}
-                  </Badge>
+                  {isAdmin && !isClosed ? (
+                    <Select
+                      value={order.priority}
+                      onValueChange={(val) => updateMut.mutate({ id, data: { priority: val as any } })}
+                      disabled={updateMut.isPending}
+                    >
+                      <SelectTrigger className="h-8 rounded-lg text-sm w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="secondary" className={`${getPriorityColor(order.priority)} capitalize border-transparent mt-0.5`}>
+                      {order.priority}
+                    </Badge>
+                  )}
                 </div>
               </div>
 

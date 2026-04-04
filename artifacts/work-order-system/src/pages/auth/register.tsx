@@ -29,7 +29,7 @@ const registerSchema = z.object({
   if (data.role === "faculty" && !data.email.endsWith("@iba.edu.pk")) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Not authorised. Faculty accounts must use a @iba.edu.pk email address.",
+      message: "Not authorised.",
       path: ["email"],
     });
   }
@@ -197,11 +197,6 @@ export default function Register() {
                 {form.watch("role") === "student" && (
                   <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
                     Student accounts require a <strong>@khi.iba.edu.pk</strong> email address.
-                  </p>
-                )}
-                {form.watch("role") === "faculty" && (
-                  <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
-                    Faculty/Staff accounts require a <strong>@iba.edu.pk</strong> email address.
                   </p>
                 )}
                 {form.watch("role") === "admin" && (

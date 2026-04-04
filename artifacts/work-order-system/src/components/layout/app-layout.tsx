@@ -88,7 +88,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       )}>
         <div className="p-6 flex items-center gap-3">
           <div className="bg-white/10 p-2 rounded-xl">
-            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8" />
+            <img src={`${import.meta.env.BASE_URL}images/iba-logo.png`} alt="IBA Logo" className="w-8 h-8 object-contain" />
           </div>
           <div>
             <h1 className="font-display font-bold text-xl tracking-tight text-white leading-tight">CampusWorks</h1>

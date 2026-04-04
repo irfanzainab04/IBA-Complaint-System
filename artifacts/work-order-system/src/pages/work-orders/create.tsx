@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ArrowLeft, Building2, MapPin, Tag, AlertCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 const createSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
@@ -26,6 +27,8 @@ export default function CreateWorkOrder() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const form = useForm<z.infer<typeof createSchema>>({
     resolver: zodResolver(createSchema),
@@ -89,7 +92,7 @@ export default function CreateWorkOrder() {
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className={`grid grid-cols-1 gap-6 ${isAdmin ? "md:grid-cols-2" : ""}`}>
                 <FormField
                   control={form.control}
                   name="category"
@@ -115,29 +118,31 @@ export default function CreateWorkOrder() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-semibold flex items-center gap-2"><AlertCircle className="w-4 h-4 text-muted-foreground" /> Priority Level</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-12 rounded-xl">
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="low">Low - Routine</SelectItem>
-                          <SelectItem value="medium">Medium - Standard</SelectItem>
-                          <SelectItem value="high">High - Impacting work</SelectItem>
-                          <SelectItem value="urgent">Urgent - Hazard/Emergency</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {isAdmin && (
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-semibold flex items-center gap-2"><AlertCircle className="w-4 h-4 text-muted-foreground" /> Priority Level</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-12 rounded-xl">
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="low">Low - Routine</SelectItem>
+                            <SelectItem value="medium">Medium - Standard</SelectItem>
+                            <SelectItem value="high">High - Impacting work</SelectItem>
+                            <SelectItem value="urgent">Urgent - Hazard/Emergency</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/30 p-4 rounded-xl border border-border/50">

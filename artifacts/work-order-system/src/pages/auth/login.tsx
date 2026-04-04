@@ -62,7 +62,7 @@ export default function Login() {
       >
         <div className="flex justify-center mb-8">
           <div className="bg-primary p-4 rounded-2xl shadow-xl shadow-primary/20">
-            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-12 h-12" />
+            <img src={`${import.meta.env.BASE_URL}images/iba-logo.png`} alt="IBA Logo" className="w-12 h-12 object-contain" />
           </div>
         </div>
 

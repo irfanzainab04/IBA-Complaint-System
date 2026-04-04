@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Search, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Loader2, Users, Search, CheckCircle, XCircle, Clock, Tag, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { useCategories, useAddCategory, useDeleteCategory } from "@/hooks/use-categories";
 
 const roleColors: Record<string, string> = {
   student: "bg-blue-100 text-blue-800",
@@ -23,6 +24,23 @@ export default function UsersPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState("");
+
+  const { data: categories = [], isLoading: catsLoading } = useCategories();
+  const DEFAULT_IDS = new Set(["electrical", "plumbing", "it", "lab_equipment", "general"]);
+
+  const addCatMut = useAddCategory({
+    onSuccess: () => {
+      setNewCategory("");
+      toast({ title: "Category Added", description: "The new category is now available in work order forms." });
+    },
+    onError: (msg) => toast({ variant: "destructive", title: "Error", description: msg }),
+  });
+
+  const deleteCatMut = useDeleteCategory({
+    onSuccess: () => toast({ title: "Category Removed" }),
+    onError: (msg) => toast({ variant: "destructive", title: "Error", description: msg }),
+  });
 
   const { data: users, isLoading } = useListUsers({} as any);
 
@@ -89,6 +107,56 @@ export default function UsersPage() {
         <h1 className="text-3xl font-display font-bold text-foreground">Users</h1>
         <p className="text-muted-foreground mt-1">Manage all registered users and approve pending administrator accounts.</p>
       </div>
+
+      {/* Category Management */}
+      <Card className="rounded-2xl shadow-sm border-border/50">
+        <CardHeader className="pb-4 border-b border-border/50">
+          <CardTitle className="flex items-center gap-2 font-display text-lg">
+            <Tag className="w-5 h-5" /> Work Order Categories
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-5 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {catsLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : (
+              categories.map((cat) => (
+                <div key={cat.id} className="flex items-center gap-1 bg-muted rounded-xl pl-3 pr-1 py-1">
+                  <span className="text-sm font-medium">{cat.label}</span>
+                  {!DEFAULT_IDS.has(cat.id) && (
+                    <button
+                      onClick={() => deleteCatMut.mutate(cat.id)}
+                      disabled={deleteCatMut.isPending}
+                      className="ml-1 p-1 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      title="Remove category"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newCategory.trim()) addCatMut.mutate(newCategory.trim());
+            }}
+            className="flex gap-3"
+          >
+            <Input
+              placeholder="New category name..."
+              className="h-11 rounded-xl bg-white max-w-xs"
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+            />
+            <Button type="submit" disabled={!newCategory.trim() || addCatMut.isPending} className="h-11 rounded-xl px-5">
+              {addCatMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1.5" /> Add Category</>}
+            </Button>
+          </form>
+          <p className="text-xs text-muted-foreground">Default categories cannot be removed. Custom categories can be deleted by clicking the trash icon.</p>
+        </CardContent>
+      </Card>
 
       {/* Pending Admin Approvals */}
       {!isLoading && pendingAdmins.length > 0 && (

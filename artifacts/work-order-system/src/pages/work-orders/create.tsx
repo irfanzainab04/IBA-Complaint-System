@@ -13,11 +13,12 @@ import { Loader2, ArrowLeft, Building2, MapPin, Tag, AlertCircle } from "lucide-
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useCategories } from "@/hooks/use-categories";
 
 const createSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
   description: z.string().min(10, "Please provide more details"),
-  category: z.enum(["electrical", "plumbing", "it", "lab_equipment", "general"]),
+  category: z.string().min(1, "Category is required"),
   building: z.string().min(1, "Building is required"),
   location: z.string().min(2, "Location details are required"),
   priority: z.enum(["low", "medium", "high", "urgent"]),
@@ -29,6 +30,7 @@ export default function CreateWorkOrder() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const { data: categories = [] } = useCategories();
 
   const form = useForm<z.infer<typeof createSchema>>({
     resolver: zodResolver(createSchema),
@@ -106,11 +108,9 @@ export default function CreateWorkOrder() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="electrical">Electrical</SelectItem>
-                          <SelectItem value="plumbing">Plumbing</SelectItem>
-                          <SelectItem value="it">IT / Network</SelectItem>
-                          <SelectItem value="lab_equipment">Lab Equipment</SelectItem>
-                          <SelectItem value="general">General Maintenance</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

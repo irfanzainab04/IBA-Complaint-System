@@ -1,4 +1,5 @@
 import os
+import json
 import uuid
 import datetime
 import jwt
@@ -89,6 +90,67 @@ def db_error_response(e):
     if "PGRST205" in err_str or "schema cache" in err_str:
         return jsonify({"error": "Database tables not set up yet. Please run the SQL setup script in your Supabase SQL Editor."}), 503
     return jsonify({"error": err_str}), 500
+
+
+# ─── Categories ───────────────────────────────────────────────────────────────
+
+CATEGORIES_FILE = os.path.join(os.path.dirname(__file__), "categories.json")
+DEFAULT_CATEGORIES = [
+    {"id": "electrical", "label": "Electrical"},
+    {"id": "plumbing", "label": "Plumbing"},
+    {"id": "it", "label": "IT / Network"},
+    {"id": "lab_equipment", "label": "Lab Equipment"},
+    {"id": "general", "label": "General Maintenance"},
+]
+
+def get_categories():
+    try:
+        with open(CATEGORIES_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return DEFAULT_CATEGORIES
+
+def save_categories(cats):
+    with open(CATEGORIES_FILE, "w") as f:
+        json.dump(cats, f)
+
+
+@app.route("/categories")
+def list_categories():
+    return jsonify(get_categories())
+
+
+@app.route("/categories", methods=["POST"])
+@require_auth
+@require_role("admin")
+def add_category():
+    data = get_json()
+    label = data.get("label", "").strip()
+    if not label:
+        return jsonify({"error": "Label is required"}), 400
+    cats = get_categories()
+    cat_id = label.lower().replace(" ", "_").replace("/", "_").replace("-", "_")
+    if any(c["id"] == cat_id for c in cats):
+        return jsonify({"error": "Category already exists"}), 400
+    new_cat = {"id": cat_id, "label": label}
+    cats.append(new_cat)
+    save_categories(cats)
+    return jsonify(new_cat), 201
+
+
+@app.route("/categories/<cat_id>", methods=["DELETE"])
+@require_auth
+@require_role("admin")
+def delete_category(cat_id):
+    default_ids = {c["id"] for c in DEFAULT_CATEGORIES}
+    if cat_id in default_ids:
+        return jsonify({"error": "Cannot delete a default category"}), 400
+    cats = get_categories()
+    updated = [c for c in cats if c["id"] != cat_id]
+    if len(updated) == len(cats):
+        return jsonify({"error": "Category not found"}), 404
+    save_categories(updated)
+    return jsonify({"message": "Deleted"})
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────

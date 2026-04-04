@@ -21,11 +21,12 @@ import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { getPriorityColor, getStatusColor, getStatusLabel } from "./work-orders/list";
 import { Loader2 } from "lucide-react";
+import { useCategories } from "@/hooks/use-categories";
 
 const createSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
   description: z.string().min(10, "Please provide more details"),
-  category: z.enum(["electrical", "plumbing", "it", "lab_equipment", "general"]),
+  category: z.string().min(1, "Category is required"),
   building: z.string().min(1, "Building is required"),
   location: z.string().min(2, "Location details are required"),
   priority: z.enum(["low", "medium", "high", "urgent"]),
@@ -44,6 +45,7 @@ export default function Dashboard() {
 
   const canCreate = ['student', 'faculty', 'admin'].includes(user?.role || '');
   const isAdmin = user?.role === 'admin';
+  const { data: categories = [] } = useCategories();
 
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
@@ -227,11 +229,9 @@ export default function Dashboard() {
                           <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select category" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="electrical">Electrical</SelectItem>
-                          <SelectItem value="plumbing">Plumbing</SelectItem>
-                          <SelectItem value="it">IT / Network</SelectItem>
-                          <SelectItem value="lab_equipment">Lab Equipment</SelectItem>
-                          <SelectItem value="general">General Maintenance</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

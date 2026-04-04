@@ -26,11 +26,11 @@ const registerSchema = z.object({
       path: ["email"],
     });
   }
-  if (data.role === "faculty") {
+  if (data.role === "faculty" && !data.email.endsWith("@iba.edu.pk")) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Not authorised. Faculty accounts cannot self-register. Please contact an administrator.",
-      path: ["role"],
+      message: "Not authorised. Faculty accounts must use a @iba.edu.pk email address.",
+      path: ["email"],
     });
   }
 });
@@ -200,8 +200,8 @@ export default function Register() {
                   </p>
                 )}
                 {form.watch("role") === "faculty" && (
-                  <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">
-                    Not authorised. Faculty accounts cannot self-register. Please contact an administrator.
+                  <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
+                    Faculty/Staff accounts require a <strong>@iba.edu.pk</strong> email address.
                   </p>
                 )}
                 {form.watch("role") === "admin" && (

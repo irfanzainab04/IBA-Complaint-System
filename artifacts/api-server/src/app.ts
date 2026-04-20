@@ -6,7 +6,7 @@ const app: Express = express();
 
 app.use(cors());
 
-const FLASK_URL = "http://localhost:8000";
+const FLASK_URL = "http://localhost:3000";
 
 app.use(
   "/api",

@@ -4,6 +4,7 @@ import os
 import json
 import uuid
 import datetime
+import re
 import jwt
 import bcrypt
 from functools import wraps
@@ -179,11 +180,15 @@ def register():
         if role not in ["student", "faculty", "admin"]:
             return jsonify({"error": "Invalid role"}), 400
 
+        # Use strict full-match patterns so role domains never overlap.
+        student_email_pattern = r"^[^@\s]+@khi\.iba\.edu\.pk$"
+        faculty_email_pattern = r"^[^@\s]+@iba\.edu\.pk$"
+
         # Email domain validation
-        if role == "student" and not email.endswith("@khi.iba.edu.pk"):
-            return jsonify({"error": "Student accounts must use a @khi.iba.edu.pk email address."}), 400
-        if role == "faculty" and not email.endswith("@iba.edu.pk"):
-            return jsonify({"error": "Faculty/Staff accounts must use a @iba.edu.pk email address."}), 400
+        if role == "student" and not re.fullmatch(student_email_pattern, email, re.IGNORECASE):
+            return jsonify({"error": "Please use a valid institutional email for the selected role."}), 400
+        if role == "faculty" and not re.fullmatch(faculty_email_pattern, email, re.IGNORECASE):
+            return jsonify({"error": "Please use a valid institutional email for the selected role."}), 400
 
         existing = supabase.table("users").select("id").eq("email", email).execute()
         if existing.data:
@@ -292,6 +297,25 @@ def approve_user(user_id):
         if not result.data:
             return jsonify({"error": "User not found"}), 404
         return jsonify({"message": "User approved successfully"})
+    except Exception as e:
+        return db_error_response(e)
+
+
+@app.route("/users/<user_id>/reject", methods=["POST"])
+@require_auth
+@require_role("admin")
+def reject_user(user_id):
+    try:
+        user_result = supabase.table("users").select("id, role, is_approved").eq("id", user_id).execute()
+        if not user_result.data:
+            return jsonify({"error": "User not found"}), 404
+
+        user = user_result.data[0]
+        if user.get("role") != "admin" or user.get("is_approved", True):
+            return jsonify({"error": "Only pending administrator requests can be rejected."}), 400
+
+        supabase.table("users").delete().eq("id", user_id).execute()
+        return jsonify({"message": "User rejected successfully"})
     except Exception as e:
         return db_error_response(e)
 

@@ -13,23 +13,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ArrowLeft, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 
+const studentEmailRegex = /^[^@\s]+@khi\.iba\.edu\.pk$/i;
+const facultyEmailRegex = /^[^@\s]+@iba\.edu\.pk$/i;
+
 const registerSchema = z.object({
   full_name: z.string().min(2, "Full name is required"),
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["student", "faculty", "admin"], { required_error: "Please select a role" }),
 }).superRefine((data, ctx) => {
-  if (data.role === "student" && !data.email.endsWith("@khi.iba.edu.pk")) {
+  const normalizedEmail = data.email.trim().toLowerCase();
+
+  if (data.role === "student" && !studentEmailRegex.test(normalizedEmail)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Student accounts must use a @khi.iba.edu.pk email address",
+      message: "Please use a valid institutional email for the selected role",
       path: ["email"],
     });
   }
-  if (data.role === "faculty" && !data.email.endsWith("@iba.edu.pk")) {
+  if (data.role === "faculty" && !facultyEmailRegex.test(normalizedEmail)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Not authorised.",
+      message: "Please use a valid institutional email for the selected role",
       path: ["email"],
     });
   }
@@ -194,11 +199,6 @@ export default function Register() {
                   )}
                 />
 
-                {form.watch("role") === "student" && (
-                  <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
-                    Student accounts require a <strong>@khi.iba.edu.pk</strong> email address.
-                  </p>
-                )}
                 {form.watch("role") === "admin" && (
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
                     Administrator accounts require approval from an existing administrator before access is granted.

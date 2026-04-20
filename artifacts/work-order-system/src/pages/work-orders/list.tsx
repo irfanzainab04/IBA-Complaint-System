@@ -6,9 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FilterX, Clock, MapPin, Tag } from "lucide-react";
+import { Search, Plus, FilterX, Clock, MapPin, Tag, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { useCategories, useAddCategory, useDeleteCategory } from "@/hooks/use-categories";
 
 export function getStatusColor(status: string) {
   switch (status) {
@@ -42,9 +44,27 @@ export function getPriorityColor(priority: string) {
 
 export default function WorkOrdersList() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+
+  const { data: categories = [], isLoading: catsLoading } = useCategories();
+  const DEFAULT_IDS = new Set(["electrical", "plumbing", "it", "lab_equipment", "general"]);
+
+  const addCatMut = useAddCategory({
+    onSuccess: () => {
+      setNewCategory("");
+      toast({ title: "Category Added", description: "The new category is now available in work order forms." });
+    },
+    onError: (msg) => toast({ variant: "destructive", title: "Error", description: msg }),
+  });
+
+  const deleteCatMut = useDeleteCategory({
+    onSuccess: () => toast({ title: "Category Removed" }),
+    onError: (msg) => toast({ variant: "destructive", title: "Error", description: msg }),
+  });
 
   const { data: workOrders, isLoading } = useListWorkOrders(
     {
@@ -125,6 +145,58 @@ export default function WorkOrdersList() {
           )}
         </div>
       </Card>
+
+      {user?.role === "admin" && (
+        <Card className="p-4 rounded-2xl shadow-sm border-border/50">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4" />
+              <h2 className="font-semibold text-foreground">Work Order Categories</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {catsLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              ) : (
+                categories.map((cat) => (
+                  <div key={cat.id} className="flex items-center gap-1 bg-muted rounded-xl pl-3 pr-1 py-1">
+                    <span className="text-sm font-medium">{cat.label}</span>
+                    {!DEFAULT_IDS.has(cat.id) && (
+                      <button
+                        onClick={() => deleteCatMut.mutate(cat.id)}
+                        disabled={deleteCatMut.isPending}
+                        className="ml-1 p-1 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        title="Remove category"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newCategory.trim()) {
+                  addCatMut.mutate(newCategory.trim());
+                }
+              }}
+              className="flex gap-3"
+            >
+              <Input
+                placeholder="New category name..."
+                className="h-11 rounded-xl bg-white max-w-xs"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+              />
+              <Button type="submit" disabled={!newCategory.trim() || addCatMut.isPending} className="h-11 rounded-xl px-5">
+                {addCatMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1.5" /> Add Category</>}
+              </Button>
+            </form>
+            <p className="text-xs text-muted-foreground">Default categories cannot be removed. Custom categories can be deleted by clicking the trash icon.</p>
+          </div>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="space-y-4">

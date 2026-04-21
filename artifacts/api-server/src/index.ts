@@ -1,6 +1,16 @@
+import "dotenv/config";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+import { config } from "dotenv";
 import app from "./app";
 
-const rawPort = process.env["PORT"];
+// Load .env from project root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const rootEnvPath = resolve(__dirname, "../../..", ".env");
+config({ path: rootEnvPath });
+
+const rawPort = process.env["PORT_API_SERVER"];
 
 if (!rawPort) {
   throw new Error(

@@ -1,6 +1,10 @@
 from dotenv import load_dotenv
-load_dotenv()
 import os
+from pathlib import Path
+
+# Load .env from project root
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_path)
 import json
 import uuid
 import datetime

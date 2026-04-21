@@ -4,6 +4,12 @@ Usage: python artifacts/flask-backend/create_tables.py
 """
 import os
 import requests
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from project root
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_path)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
